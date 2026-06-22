@@ -14,6 +14,10 @@ func NewRouter(database *db.DB) http.Handler {
 	mux := http.NewServeMux()
 	h := handler{db: database}
 	mux.HandleFunc("GET /tracks", h.ListTracks)
+	mux.HandleFunc("GET /artists", h.ListArtists)
+	mux.HandleFunc("GET /artists/tracks", h.GetArtistTracks)
+	mux.HandleFunc("GET /albums", h.ListAlbums)
+	mux.HandleFunc("GET /albums/tracks", h.GetAlbumTracks)
 	mux.HandleFunc("GET /tracks/search", h.SearchTracks)
 	mux.HandleFunc("GET /tracks/shuffle", h.ShuffleTracks)
 	mux.HandleFunc("GET /tracks/{id}/stream", h.StreamTrack)

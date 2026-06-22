@@ -29,6 +29,69 @@ func (h handler) ListTracks(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(tracks)
 }
 
+func (h handler) ListArtists(w http.ResponseWriter, r *http.Request) {
+	artists, err := h.db.GetArtists()
+	if err != nil {
+		http.Error(w, "failed", http.StatusInternalServerError)
+		return
+	}
+	if artists == nil {
+		artists = []models.ArtistGroup{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(artists)
+}
+
+func (h handler) ListAlbums(w http.ResponseWriter, r *http.Request) {
+	albums, err := h.db.GetAlbums()
+	if err != nil {
+		http.Error(w, "failed", http.StatusInternalServerError)
+		return
+	}
+	if albums == nil {
+		albums = []models.AlbumGroup{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(albums)
+}
+
+func (h handler) GetArtistTracks(w http.ResponseWriter, r *http.Request) {
+	artist := r.URL.Query().Get("name")
+	if artist == "" {
+		http.Error(w, "missing name", http.StatusBadRequest)
+		return
+	}
+	tracks, err := h.db.GetTracksByArtist(artist)
+	if err != nil {
+		http.Error(w, "failed", http.StatusInternalServerError)
+		return
+	}
+	if tracks == nil {
+		tracks = []models.Track{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tracks)
+}
+
+func (h handler) GetAlbumTracks(w http.ResponseWriter, r *http.Request) {
+	album := r.URL.Query().Get("album")
+	artist := r.URL.Query().Get("artist")
+	if album == "" {
+		http.Error(w, "missing album", http.StatusBadRequest)
+		return
+	}
+	tracks, err := h.db.GetTracksByAlbum(album, artist)
+	if err != nil {
+		http.Error(w, "failed", http.StatusInternalServerError)
+		return
+	}
+	if tracks == nil {
+		tracks = []models.Track{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tracks)
+}
+
 func (h handler) SearchTracks(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	if q == "" {

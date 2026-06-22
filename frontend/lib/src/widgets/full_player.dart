@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:frontend/src/audio/handler.dart';
 import 'package:frontend/src/services/service.dart';
+import 'package:frontend/src/widgets/queue_view.dart';
 import 'package:just_audio/just_audio.dart';
 
 class FullPlayer extends ConsumerWidget {
@@ -429,6 +430,18 @@ class _PortraitContent extends StatelessWidget {
           const SizedBox(height: 20),
           _VolumeSlider(handler: handler),
           const Spacer(),
+          Center(
+            child: IconButton(
+              icon: Icon(Icons.queue_music,
+                  color: Colors.white.withValues(alpha: 0.5)),
+              onPressed: () => showModalBottomSheet(
+                context: context,
+                backgroundColor: Colors.transparent,
+                isScrollControlled: true,
+                builder: (_) => const QueueSheet(),
+              ),
+            ),
+          ),
           const SizedBox(height: 8),
         ],
       ),

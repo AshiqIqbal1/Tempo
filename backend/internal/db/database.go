@@ -309,6 +309,90 @@ func (db *DB) DeletePlaylist(playlistID int64) error {
 	return err
 }
 
+func (db *DB) GetArtists() ([]models.ArtistGroup, error) {
+	rows, err := db.conn.Query(`
+		SELECT artist, COUNT(*) as track_count
+		FROM tracks
+		GROUP BY artist
+		ORDER BY artist
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var artists []models.ArtistGroup
+	for rows.Next() {
+		var a models.ArtistGroup
+		if err := rows.Scan(&a.Artist, &a.TrackCount); err != nil {
+			return nil, err
+		}
+		artists = append(artists, a)
+	}
+	return artists, nil
+}
+
+func (db *DB) GetAlbums() ([]models.AlbumGroup, error) {
+	rows, err := db.conn.Query(`
+		SELECT album, artist, COUNT(*) as track_count, MAX(year) as year
+		FROM tracks
+		GROUP BY album, artist
+		ORDER BY album
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var albums []models.AlbumGroup
+	for rows.Next() {
+		var a models.AlbumGroup
+		if err := rows.Scan(&a.Album, &a.Artist, &a.TrackCount, &a.Year); err != nil {
+			return nil, err
+		}
+		albums = append(albums, a)
+	}
+	return albums, nil
+}
+
+func (db *DB) GetTracksByArtist(artist string) ([]models.Track, error) {
+	rows, err := db.conn.Query(`
+		SELECT id, title, artist, album, path, year, duration
+		FROM tracks WHERE artist = ? ORDER BY album, title
+	`, artist)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var tracks []models.Track
+	for rows.Next() {
+		var t models.Track
+		if err := rows.Scan(&t.ID, &t.Title, &t.Artist, &t.Album, &t.Path, &t.Year, &t.Duration); err != nil {
+			return nil, err
+		}
+		tracks = append(tracks, t)
+	}
+	return tracks, nil
+}
+
+func (db *DB) GetTracksByAlbum(album, artist string) ([]models.Track, error) {
+	rows, err := db.conn.Query(`
+		SELECT id, title, artist, album, path, year, duration
+		FROM tracks WHERE album = ? AND artist = ? ORDER BY id
+	`, album, artist)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var tracks []models.Track
+	for rows.Next() {
+		var t models.Track
+		if err := rows.Scan(&t.ID, &t.Title, &t.Artist, &t.Album, &t.Path, &t.Year, &t.Duration); err != nil {
+			return nil, err
+		}
+		tracks = append(tracks, t)
+	}
+	return tracks, nil
+}
+
 func (db *DB) GetPlaylistByName(name string) (*models.Playlist, error) {
 	var p models.Playlist
 	err := db.conn.QueryRow(`

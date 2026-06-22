@@ -86,17 +86,32 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
-  final _pages = const [
-    Library(),
-    SearchView(),
-    PlaylistsView(),
-    SettingsView(),
+  final _navigatorKeys = [
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+    GlobalKey<NavigatorState>(),
+  ];
+
+  late final _pages = [
+    const Library(),
+    const SearchView(),
+    Navigator(
+      key: _navigatorKeys[2],
+      onGenerateRoute: (_) => MaterialPageRoute(
+        builder: (_) => const PlaylistsView(),
+      ),
+    ),
+    const SettingsView(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _pages,
+      ),
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
