@@ -311,10 +311,16 @@ func (db *DB) DeletePlaylist(playlistID int64) error {
 
 func (db *DB) GetArtists() ([]models.ArtistGroup, error) {
 	rows, err := db.conn.Query(`
-		SELECT artist, COUNT(*) as track_count
+		SELECT
+			CASE WHEN INSTR(artist, '/') > 0
+				THEN TRIM(SUBSTR(artist, 1, INSTR(artist, '/') - 1))
+				ELSE artist
+			END as primary_artist,
+			COUNT(*) as track_count
 		FROM tracks
-		GROUP BY artist
-		ORDER BY artist
+		GROUP BY primary_artist
+		HAVING track_count >= 5
+		ORDER BY primary_artist
 	`)
 	if err != nil {
 		return nil, err
@@ -333,7 +339,7 @@ func (db *DB) GetArtists() ([]models.ArtistGroup, error) {
 
 func (db *DB) GetAlbums() ([]models.AlbumGroup, error) {
 	rows, err := db.conn.Query(`
-		SELECT album, artist, COUNT(*) as track_count, MAX(year) as year
+		SELECT album, artist, COUNT(*) as track_count, MAX(year) as year, MIN(id) as first_track_id
 		FROM tracks
 		GROUP BY album, artist
 		ORDER BY album
@@ -345,7 +351,7 @@ func (db *DB) GetAlbums() ([]models.AlbumGroup, error) {
 	var albums []models.AlbumGroup
 	for rows.Next() {
 		var a models.AlbumGroup
-		if err := rows.Scan(&a.Album, &a.Artist, &a.TrackCount, &a.Year); err != nil {
+		if err := rows.Scan(&a.Album, &a.Artist, &a.TrackCount, &a.Year, &a.FirstTrackID); err != nil {
 			return nil, err
 		}
 		albums = append(albums, a)
@@ -356,8 +362,8 @@ func (db *DB) GetAlbums() ([]models.AlbumGroup, error) {
 func (db *DB) GetTracksByArtist(artist string) ([]models.Track, error) {
 	rows, err := db.conn.Query(`
 		SELECT id, title, artist, album, path, year, duration
-		FROM tracks WHERE artist = ? ORDER BY album, title
-	`, artist)
+		FROM tracks WHERE artist = ? OR artist LIKE ? ORDER BY album, title
+	`, artist, artist+"/%")
 	if err != nil {
 		return nil, err
 	}

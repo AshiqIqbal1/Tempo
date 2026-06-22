@@ -25,23 +25,15 @@ class Library extends ConsumerStatefulWidget {
 }
 
 class _LibraryState extends ConsumerState<Library> {
-  static const _pageSize = 20;
+  static const _maxTracks = 150;
 
   final List<TrackModel> _tracks = [];
-  int _offset = 0;
-  bool _hasMore = true;
   late Future<List<TrackModel>> _tracksFuture;
-  final ScrollController _scrollController = ScrollController();
-  bool _isLoadingMore = false;
 
-  Future<List<TrackModel>> _fetchTracks({
-    required int offset,
-    required int limit,
-  }) async {
+  Future<List<TrackModel>> _fetchRandomTracks() async {
     try {
       final response = await http.get(
-        Uri.parse(
-            '${TrackModel.baseUrl}/tracks?offset=$offset&limit=$limit'),
+        Uri.parse('${TrackModel.baseUrl}/tracks/shuffle?limit=$_maxTracks'),
       );
       if (response.statusCode != 200) return [];
       return compute(_parseTracks, response.body);
@@ -53,55 +45,14 @@ class _LibraryState extends ConsumerState<Library> {
   @override
   void initState() {
     super.initState();
-    _tracksFuture = _fetchTracks(offset: 0, limit: _pageSize).then((tracks) {
+    _tracksFuture = _fetchRandomTracks().then((tracks) {
       setState(() {
         _tracks.addAll(tracks);
-        _offset = tracks.length;
-        _hasMore = tracks.length == _pageSize;
       });
       return tracks;
     });
-    _scrollController.addListener(_onScroll);
   }
 
-  @override
-  void dispose() {
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _onScroll() {
-    if (!_hasMore || _isLoadingMore) return;
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 300) {
-      _loadMore();
-    }
-  }
-
-  Future<void> _loadMore() async {
-    setState(() => _isLoadingMore = true);
-    try {
-      final newTracks = await _fetchTracks(offset: _offset, limit: _pageSize);
-      final handler = ref.read(audioHandlerProvider);
-      if (handler.hasQueue) {
-        handler.appendToQueue(newTracks);
-      }
-      setState(() {
-        _tracks.addAll(newTracks);
-        _offset += newTracks.length;
-        _hasMore = newTracks.length == _pageSize;
-        _isLoadingMore = false;
-      });
-    } catch (e) {
-      setState(() => _isLoadingMore = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load more: $e')),
-        );
-      }
-    }
-  }
 
   Future<void> _loadMix(dynamic handler, int count) async {
     try {
@@ -142,15 +93,8 @@ class _LibraryState extends ConsumerState<Library> {
                   FilledButton.tonal(
                     onPressed: () => setState(() {
                       _tracks.clear();
-                      _offset = 0;
-                      _hasMore = true;
-                      _tracksFuture =
-                          _fetchTracks(offset: 0, limit: _pageSize).then((t) {
-                        setState(() {
-                          _tracks.addAll(t);
-                          _offset = t.length;
-                          _hasMore = t.length == _pageSize;
-                        });
+                      _tracksFuture = _fetchRandomTracks().then((t) {
+                        setState(() => _tracks.addAll(t));
                         return t;
                       });
                     }),
@@ -166,19 +110,15 @@ class _LibraryState extends ConsumerState<Library> {
             backgroundColor: const Color(0xFF1A1A1A),
             onRefresh: () async {
               try {
-                final tracks =
-                    await _fetchTracks(offset: 0, limit: _pageSize);
+                final tracks = await _fetchRandomTracks();
                 setState(() {
                   _tracks
                     ..clear()
                     ..addAll(tracks);
-                  _offset = tracks.length;
-                  _hasMore = tracks.length == _pageSize;
                 });
               } catch (_) {}
             },
             child: CustomScrollView(
-              controller: _scrollController,
               slivers: [
                 SliverAppBar(
                   backgroundColor: const Color(0xFF0A0A0A),
@@ -328,7 +268,7 @@ class _LibraryState extends ConsumerState<Library> {
                     child: Row(
                       children: [
                         Text(
-                          '${_tracks.length}${_hasMore ? '+' : ''} tracks',
+                          '${_tracks.length} tracks',
                           style: TextStyle(
                             color: Colors.white.withValues(alpha: 0.4),
                             fontSize: 13,
@@ -394,7 +334,7 @@ class _LibraryState extends ConsumerState<Library> {
                         },
                       );
                     },
-                    childCount: _tracks.length + (_hasMore ? 1 : 0),
+                    childCount: _tracks.length,
                   ),
                 ),
                 const SliverToBoxAdapter(child: SizedBox(height: 96)),
@@ -768,15 +708,22 @@ class _AlbumBrowserState extends State<_AlbumBrowser> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color:
-                                      Colors.white.withValues(alpha: 0.05),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Center(
-                                  child: Icon(Icons.album,
-                                      color: Colors.white24, size: 40),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: CachedNetworkImage(
+                                  imageUrl:
+                                      '${TrackModel.baseUrl}/tracks/${a['first_track_id']}/art/thumbnail',
+                                  fit: BoxFit.cover,
+                                  memCacheWidth: 256,
+                                  memCacheHeight: 256,
+                                  errorWidget: (_, _, _) => Container(
+                                    color: Colors.white
+                                        .withValues(alpha: 0.05),
+                                    child: const Center(
+                                      child: Icon(Icons.album,
+                                          color: Colors.white24, size: 40),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),

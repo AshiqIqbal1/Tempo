@@ -21,13 +21,18 @@ func main() {
 		return
 	}
 
-	err = scanner.Scan(os.Getenv("MUSIC_DIR"), database)
-	if err != nil {
-		log.Fatalf("Failing to scan music directory: %v", err)
-		return
-	}
+	musicDir := os.Getenv("MUSIC_DIR")
+	router := api.NewRouter(database, musicDir)
 
-	router := api.NewRouter(database)
+	// Scan in background so API is available immediately
+	go func() {
+		log.Println("Scanning music directory...")
+		err := scanner.Scan(musicDir, database)
+		if err != nil {
+			log.Printf("Scan error: %v", err)
+		}
+		log.Println("Scan complete.")
+	}()
 
 	log.Println("Server is running on port 8081...")
 	log.Fatal(http.ListenAndServe(":8081", router))

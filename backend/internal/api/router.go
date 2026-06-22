@@ -7,17 +7,19 @@ import (
 )
 
 type handler struct {
-	db *db.DB
+	db       *db.DB
+	musicDir string
 }
 
-func NewRouter(database *db.DB) http.Handler {
+func NewRouter(database *db.DB, musicDir string) http.Handler {
 	mux := http.NewServeMux()
-	h := handler{db: database}
+	h := handler{db: database, musicDir: musicDir}
 	mux.HandleFunc("GET /tracks", h.ListTracks)
 	mux.HandleFunc("GET /artists", h.ListArtists)
 	mux.HandleFunc("GET /artists/tracks", h.GetArtistTracks)
 	mux.HandleFunc("GET /albums", h.ListAlbums)
 	mux.HandleFunc("GET /albums/tracks", h.GetAlbumTracks)
+	mux.HandleFunc("POST /scan", h.TriggerScan)
 	mux.HandleFunc("GET /tracks/search", h.SearchTracks)
 	mux.HandleFunc("GET /tracks/shuffle", h.ShuffleTracks)
 	mux.HandleFunc("GET /tracks/{id}/stream", h.StreamTrack)

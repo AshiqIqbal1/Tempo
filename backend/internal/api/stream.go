@@ -4,9 +4,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/AshiqIqbal1/Tempo/backend/internal/models"
+	"github.com/AshiqIqbal1/Tempo/backend/internal/scanner"
 )
+
+var scanMu sync.Mutex
+var scanning bool
 
 func (h handler) ListTracks(w http.ResponseWriter, r *http.Request) {
 	limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
@@ -27,6 +32,30 @@ func (h handler) ListTracks(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tracks)
+}
+
+func (h handler) TriggerScan(w http.ResponseWriter, r *http.Request) {
+	scanMu.Lock()
+	if scanning {
+		scanMu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "already scanning"})
+		return
+	}
+	scanning = true
+	scanMu.Unlock()
+
+	go func() {
+		defer func() {
+			scanMu.Lock()
+			scanning = false
+			scanMu.Unlock()
+		}()
+		scanner.Scan(h.musicDir, h.db)
+	}()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "scan started"})
 }
 
 func (h handler) ListArtists(w http.ResponseWriter, r *http.Request) {

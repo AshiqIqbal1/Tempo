@@ -16,10 +16,11 @@ type ArtistGroup struct {
 }
 
 type AlbumGroup struct {
-	Album      string `json:"album"`
-	Artist     string `json:"artist"`
-	TrackCount int    `json:"track_count"`
-	Year       int    `json:"year"`
+	Album        string `json:"album"`
+	Artist       string `json:"artist"`
+	TrackCount   int    `json:"track_count"`
+	Year         int    `json:"year"`
+	FirstTrackID int64  `json:"first_track_id"`
 }
 
 type Playlist struct {
