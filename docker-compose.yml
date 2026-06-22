@@ -1,0 +1,15 @@
+services:
+  tempo:
+    build: ./backend
+    ports:
+      - "8081:8081"
+    volumes:
+      - /mnt/data/music/Tempo:/music:ro
+      - tempo-data:/data
+    environment:
+      - MUSIC_DIR=/music
+      - DB_PATH=/data/tempo.db
+    restart: unless-stopped
+
+volumes:
+  tempo-data:
