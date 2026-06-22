@@ -1,0 +1,223 @@
+package api
+
+import (
+	"encoding/json"
+	"net/http"
+	"strconv"
+
+	"github.com/AshiqIqbal1/Tempo/backend/internal/models"
+)
+
+func (h handler) ListTracks(w http.ResponseWriter, r *http.Request) {
+	limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
+	if err != nil || limit <= 0 {
+		limit = 20
+	}
+
+	offset, err := strconv.Atoi(r.URL.Query().Get("offset"))
+	if err != nil || offset < 0 {
+		offset = 0
+	}
+
+	tracks, err := h.db.GetTracks(limit, offset)
+	if err != nil {
+		http.Error(w, "failed to fetch tracks", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tracks)
+}
+
+func (h handler) SearchTracks(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query().Get("q")
+	if q == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("[]"))
+		return
+	}
+	limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
+	if err != nil || limit <= 0 {
+		limit = 30
+	}
+	tracks, err := h.db.SearchTracks(q, limit)
+	if err != nil {
+		http.Error(w, "search failed", http.StatusInternalServerError)
+		return
+	}
+	if tracks == nil {
+		tracks = []models.Track{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tracks)
+}
+
+func (h handler) ShuffleTracks(w http.ResponseWriter, r *http.Request) {
+	limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
+	if err != nil || limit <= 0 {
+		limit = 100
+	}
+
+	tracks, err := h.db.GetRandomTracks(limit)
+	if err != nil {
+		http.Error(w, "failed to fetch tracks", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tracks)
+}
+
+func (h handler) StreamTrack(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id been passed", http.StatusBadRequest)
+		return
+	}
+
+	track, err := h.db.GetTrack(id)
+	if err != nil {
+		http.Error(w, "track not found", http.StatusNotFound)
+		return
+	}
+
+	http.ServeFile(w, r, track.Path)
+}
+
+func (h handler) GetTrackArt(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id been passed", http.StatusBadRequest)
+		return
+	}
+
+	data, err := h.db.GetArt(id)
+	if err != nil {
+		http.Error(w, "track art not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Cache-Control", "max-age=2592000")
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Write(data)
+}
+
+func (h handler) ListPlaylists(w http.ResponseWriter, r *http.Request) {
+	playlists, err := h.db.GetPlaylists()
+	if err != nil {
+		http.Error(w, "failed to fetch playlists", http.StatusInternalServerError)
+		return
+	}
+	if playlists == nil {
+		playlists = []models.Playlist{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(playlists)
+}
+
+func (h handler) CreatePlaylist(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Name == "" {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	id, err := h.db.CreatePlaylist(body.Name)
+	if err != nil {
+		http.Error(w, "failed to create playlist", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]int64{"id": id})
+}
+
+func (h handler) GetPlaylistTracks(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	limit, err := strconv.Atoi(r.URL.Query().Get("limit"))
+	if err != nil || limit <= 0 {
+		limit = 20
+	}
+	offset, err := strconv.Atoi(r.URL.Query().Get("offset"))
+	if err != nil || offset < 0 {
+		offset = 0
+	}
+	tracks, err := h.db.GetPlaylistTracks(id, limit, offset)
+	if err != nil {
+		http.Error(w, "failed to fetch tracks", http.StatusInternalServerError)
+		return
+	}
+	if tracks == nil {
+		tracks = []models.Track{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tracks)
+}
+
+func (h handler) AddToPlaylist(w http.ResponseWriter, r *http.Request) {
+	playlistID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid playlist id", http.StatusBadRequest)
+		return
+	}
+	var body struct {
+		TrackID int64 `json:"track_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if err := h.db.AddTrackToPlaylist(playlistID, body.TrackID); err != nil {
+		http.Error(w, "failed to add track", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h handler) RemoveFromPlaylist(w http.ResponseWriter, r *http.Request) {
+	playlistID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid playlist id", http.StatusBadRequest)
+		return
+	}
+	trackID, err := strconv.ParseInt(r.PathValue("trackId"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid track id", http.StatusBadRequest)
+		return
+	}
+	h.db.RemoveTrackFromPlaylist(playlistID, trackID)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h handler) DeletePlaylist(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	h.db.DeletePlaylist(id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h handler) GetTrackThumbnail(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	data, err := h.db.GetThumbnail(id)
+	if err != nil || data == nil {
+		http.Error(w, "thumbnail not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Cache-Control", "max-age=2592000")
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Write(data)
+}
