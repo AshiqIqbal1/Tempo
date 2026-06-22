@@ -48,9 +48,9 @@ class QueueSheet extends ConsumerWidget {
             ),
           ),
           // Now playing
-          if (handler.currentTrack != null)
+          if (handler.currentTrack case final current?)
             _QueueTile(
-              track: handler.currentTrack!,
+              track: current,
               isPlaying: true,
               onTap: () {},
               onDismiss: null,
@@ -179,7 +179,7 @@ class _QueueTile extends StatelessWidget {
           color: Colors.red.withValues(alpha: 0.3),
           child: const Icon(Icons.delete, color: Colors.white),
         ),
-        onDismissed: (_) => onDismiss!(),
+        onDismissed: (_) => onDismiss?.call(),
         child: child,
       );
     }

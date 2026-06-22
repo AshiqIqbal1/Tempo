@@ -69,8 +69,9 @@ class _EqualizerSheetState extends ConsumerState<EqualizerSheet> {
   }
 
   void _applyGains() {
-    if (_params == null) return;
-    final bands = _params!.bands;
+    final params = _params;
+    if (params == null) return;
+    final bands = params.bands;
     for (int i = 0; i < bands.length && i < _gains.length; i++) {
       bands[i].setGain(_gains[i]);
     }
