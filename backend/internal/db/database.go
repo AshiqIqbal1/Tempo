@@ -72,6 +72,10 @@ func New(path string) (*DB, error) {
 		return nil, err
 	}
 
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_tracks_title ON tracks(title COLLATE NOCASE)")
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist COLLATE NOCASE)")
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_tracks_album ON tracks(album COLLATE NOCASE)")
+
 	return &DB{conn: db}, nil
 }
 
@@ -146,6 +150,7 @@ func (db *DB) GetRandomTracks(limit int) ([]models.Track, error) {
 
 func (db *DB) SearchTracks(query string, limit int) ([]models.Track, error) {
 	q := "%" + query + "%"
+	prefix := query + "%"
 	rows, err := db.conn.Query(`
 		SELECT id, title, artist, album, path, year, duration
 		FROM tracks
@@ -156,7 +161,7 @@ func (db *DB) SearchTracks(query string, limit int) ([]models.Track, error) {
 			     ELSE 2 END,
 			title
 		LIMIT ?
-	`, q, q, q, q, q, limit)
+	`, q, q, q, prefix, prefix, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -302,6 +307,96 @@ func (db *DB) DeletePlaylist(playlistID int64) error {
 	db.conn.Exec("DELETE FROM playlist_tracks WHERE playlist_id = ?", playlistID)
 	_, err := db.conn.Exec("DELETE FROM playlists WHERE id = ?", playlistID)
 	return err
+}
+
+func (db *DB) GetArtists() ([]models.ArtistGroup, error) {
+	rows, err := db.conn.Query(`
+		SELECT
+			CASE WHEN INSTR(artist, '/') > 0
+				THEN TRIM(SUBSTR(artist, 1, INSTR(artist, '/') - 1))
+				ELSE artist
+			END as primary_artist,
+			COUNT(*) as track_count
+		FROM tracks
+		GROUP BY primary_artist
+		HAVING track_count >= 5
+		ORDER BY primary_artist
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var artists []models.ArtistGroup
+	for rows.Next() {
+		var a models.ArtistGroup
+		if err := rows.Scan(&a.Artist, &a.TrackCount); err != nil {
+			return nil, err
+		}
+		artists = append(artists, a)
+	}
+	return artists, nil
+}
+
+func (db *DB) GetAlbums() ([]models.AlbumGroup, error) {
+	rows, err := db.conn.Query(`
+		SELECT album, artist, COUNT(*) as track_count, MAX(year) as year, MIN(id) as first_track_id
+		FROM tracks
+		GROUP BY album, artist
+		ORDER BY album
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var albums []models.AlbumGroup
+	for rows.Next() {
+		var a models.AlbumGroup
+		if err := rows.Scan(&a.Album, &a.Artist, &a.TrackCount, &a.Year, &a.FirstTrackID); err != nil {
+			return nil, err
+		}
+		albums = append(albums, a)
+	}
+	return albums, nil
+}
+
+func (db *DB) GetTracksByArtist(artist string) ([]models.Track, error) {
+	rows, err := db.conn.Query(`
+		SELECT id, title, artist, album, path, year, duration
+		FROM tracks WHERE artist = ? OR artist LIKE ? ORDER BY album, title
+	`, artist, artist+"/%")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var tracks []models.Track
+	for rows.Next() {
+		var t models.Track
+		if err := rows.Scan(&t.ID, &t.Title, &t.Artist, &t.Album, &t.Path, &t.Year, &t.Duration); err != nil {
+			return nil, err
+		}
+		tracks = append(tracks, t)
+	}
+	return tracks, nil
+}
+
+func (db *DB) GetTracksByAlbum(album, artist string) ([]models.Track, error) {
+	rows, err := db.conn.Query(`
+		SELECT id, title, artist, album, path, year, duration
+		FROM tracks WHERE album = ? AND artist = ? ORDER BY id
+	`, album, artist)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var tracks []models.Track
+	for rows.Next() {
+		var t models.Track
+		if err := rows.Scan(&t.ID, &t.Title, &t.Artist, &t.Album, &t.Path, &t.Year, &t.Duration); err != nil {
+			return nil, err
+		}
+		tracks = append(tracks, t)
+	}
+	return tracks, nil
 }
 
 func (db *DB) GetPlaylistByName(name string) (*models.Playlist, error) {

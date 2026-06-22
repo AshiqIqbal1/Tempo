@@ -23,39 +23,43 @@ class TempoAudioHandler extends BaseAudioHandler
 
   bool get hasQueue => _tracks.isNotEmpty;
 
+  void _broadcastState() {
+    playbackState.add(PlaybackState(
+      controls: [
+        MediaControl.skipToPrevious,
+        if (_player.playing) MediaControl.pause else MediaControl.play,
+        MediaControl.skipToNext,
+      ],
+      systemActions: const {
+        MediaAction.seek,
+        MediaAction.seekForward,
+        MediaAction.seekBackward,
+      },
+      playing: _player.playing,
+      processingState: {
+        ProcessingState.idle: AudioProcessingState.idle,
+        ProcessingState.loading: AudioProcessingState.loading,
+        ProcessingState.buffering: AudioProcessingState.buffering,
+        ProcessingState.ready: AudioProcessingState.ready,
+        ProcessingState.completed: AudioProcessingState.completed,
+      }[_player.processingState]!,
+      updatePosition: _player.position,
+      bufferedPosition: _player.bufferedPosition,
+      shuffleMode: _player.shuffleModeEnabled
+          ? AudioServiceShuffleMode.all
+          : AudioServiceShuffleMode.none,
+      repeatMode: {
+        LoopMode.off: AudioServiceRepeatMode.none,
+        LoopMode.one: AudioServiceRepeatMode.one,
+        LoopMode.all: AudioServiceRepeatMode.all,
+      }[_player.loopMode]!,
+    ));
+  }
+
   void _listenToPlaybackState() {
-    _player.playbackEventStream.listen((event) {
-      playbackState.add(PlaybackState(
-        controls: [
-          MediaControl.skipToPrevious,
-          if (_player.playing) MediaControl.pause else MediaControl.play,
-          MediaControl.skipToNext,
-        ],
-        systemActions: const {
-          MediaAction.seek,
-          MediaAction.seekForward,
-          MediaAction.seekBackward,
-        },
-        playing: _player.playing,
-        processingState: {
-          ProcessingState.idle: AudioProcessingState.idle,
-          ProcessingState.loading: AudioProcessingState.loading,
-          ProcessingState.buffering: AudioProcessingState.buffering,
-          ProcessingState.ready: AudioProcessingState.ready,
-          ProcessingState.completed: AudioProcessingState.completed,
-        }[_player.processingState]!,
-        updatePosition: _player.position,
-        bufferedPosition: _player.bufferedPosition,
-        shuffleMode: _player.shuffleModeEnabled
-            ? AudioServiceShuffleMode.all
-            : AudioServiceShuffleMode.none,
-        repeatMode: {
-          LoopMode.off: AudioServiceRepeatMode.none,
-          LoopMode.one: AudioServiceRepeatMode.one,
-          LoopMode.all: AudioServiceRepeatMode.all,
-        }[_player.loopMode]!,
-      ));
-    });
+    _player.playbackEventStream.listen((_) => _broadcastState());
+    _player.playingStream.listen((_) => _broadcastState());
+    _player.processingStateStream.listen((_) => _broadcastState());
 
     _player.currentIndexStream.listen((index) {
       if (index == null || index >= _tracks.length) return;
@@ -116,6 +120,22 @@ class TempoAudioHandler extends BaseAudioHandler
       duration: track.durationValue,
     ));
 
+    playbackState.add(PlaybackState(
+      controls: [
+        MediaControl.skipToPrevious,
+        MediaControl.play,
+        MediaControl.skipToNext,
+      ],
+      systemActions: const {
+        MediaAction.seek,
+        MediaAction.seekForward,
+        MediaAction.seekBackward,
+      },
+      playing: true,
+      processingState: AudioProcessingState.loading,
+      updatePosition: Duration.zero,
+    ));
+
     final sources =
         tracks.map((t) => AudioSource.uri(Uri.parse(t.streamUrl))).toList();
     await _player.setAudioSources(sources,
@@ -138,5 +158,29 @@ class TempoAudioHandler extends BaseAudioHandler
     final modes = [LoopMode.off, LoopMode.all, LoopMode.one];
     final next = (modes.indexOf(_player.loopMode) + 1) % modes.length;
     _player.setLoopMode(modes[next]);
+  }
+
+  int? get currentIndex => _player.currentIndex;
+
+  TrackModel? get currentTrack {
+    final idx = _player.currentIndex;
+    if (idx == null || idx >= _tracks.length) return null;
+    return _tracks[idx];
+  }
+
+  List<TrackModel> get upcomingTracks {
+    final idx = _player.currentIndex;
+    if (idx == null || idx >= _tracks.length - 1) return [];
+    return _tracks.sublist(idx + 1);
+  }
+
+  void skipToIndex(int index) {
+    _player.seek(Duration.zero, index: index);
+  }
+
+  void removeFromQueue(int index) {
+    if (index < 0 || index >= _tracks.length) return;
+    _tracks.removeAt(index);
+    _player.removeAudioSourceAt(index);
   }
 }

@@ -10,6 +10,19 @@ type Track struct {
 	Duration float64 `json:"duration"`
 }
 
+type ArtistGroup struct {
+	Artist     string `json:"artist"`
+	TrackCount int    `json:"track_count"`
+}
+
+type AlbumGroup struct {
+	Album        string `json:"album"`
+	Artist       string `json:"artist"`
+	TrackCount   int    `json:"track_count"`
+	Year         int    `json:"year"`
+	FirstTrackID int64  `json:"first_track_id"`
+}
+
 type Playlist struct {
 	ID         int64  `json:"id"`
 	Name       string `json:"name"`

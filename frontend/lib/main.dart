@@ -86,17 +86,39 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
-  final _pages = const [
-    Library(),
-    SearchView(),
-    PlaylistsView(),
-    SettingsView(),
-  ];
+  final _navigatorKey = GlobalKey<NavigatorState>();
+  final Map<int, Widget> _pageCache = {};
+
+  Widget _getPage(int index) {
+    return _pageCache.putIfAbsent(index, () {
+      switch (index) {
+        case 0: return const Library();
+        case 1: return const SearchView();
+        case 2: return Navigator(
+          key: _navigatorKey,
+          onGenerateRoute: (_) => MaterialPageRoute(
+            builder: (_) => const PlaylistsView(),
+          ),
+        );
+        case 3: return const SettingsView();
+        default: return const SizedBox.shrink();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Only build pages that have been visited
+    if (!_pageCache.containsKey(_currentIndex)) {
+      _getPage(_currentIndex);
+    }
     return Scaffold(
-      body: _pages[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: List.generate(4, (i) =>
+          _pageCache.containsKey(i) ? _pageCache[i]! : const SizedBox.shrink(),
+        ),
+      ),
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

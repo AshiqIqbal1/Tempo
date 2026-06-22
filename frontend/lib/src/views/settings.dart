@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/src/models/track.dart';
 import 'package:frontend/src/widgets/equalizer.dart';
+import 'package:http/http.dart' as http;
 
 class SettingsView extends StatelessWidget {
   const SettingsView({super.key});
@@ -45,10 +47,59 @@ class SettingsView extends StatelessWidget {
                   builder: (_) => const EqualizerSheet(),
                 ),
               ),
+              _ScanTile(),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ScanTile extends StatefulWidget {
+  @override
+  State<_ScanTile> createState() => _ScanTileState();
+}
+
+class _ScanTileState extends State<_ScanTile> {
+  bool _scanning = false;
+
+  Future<void> _triggerScan() async {
+    setState(() => _scanning = true);
+    try {
+      await http.post(Uri.parse('${TrackModel.baseUrl}/scan'));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Scan started — pull to refresh library')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not reach server')),
+        );
+      }
+    }
+    setState(() => _scanning = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: _scanning
+          ? const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.refresh, color: Colors.white70),
+      title: const Text('Rescan Library',
+          style: TextStyle(color: Colors.white)),
+      subtitle: Text('Scan for new music files',
+          style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
+      trailing: Icon(Icons.chevron_right,
+          color: Colors.white.withValues(alpha: 0.3)),
+      onTap: _scanning ? null : _triggerScan,
     );
   }
 }

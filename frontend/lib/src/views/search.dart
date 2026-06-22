@@ -5,7 +5,6 @@ import 'package:audio_service/audio_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:frontend/src/audio/handler.dart';
 import 'package:frontend/src/models/track.dart';
 import 'package:frontend/src/services/service.dart';
 import 'package:http/http.dart' as http;
@@ -39,7 +38,7 @@ class _SearchViewState extends ConsumerState<SearchView> {
       });
       return;
     }
-    _debounce = Timer(const Duration(milliseconds: 300), () => _search(query));
+    _debounce = Timer(const Duration(milliseconds: 150), () => _search(query));
   }
 
   Future<void> _search(String query) async {
@@ -132,14 +131,21 @@ class _SearchViewState extends ConsumerState<SearchView> {
           )
         else
           Expanded(
-            child: ListView.builder(
-              itemCount: _results.length,
-              itemBuilder: (context, index) {
-                final track = _results[index];
-                return _SearchTile(
-                  track: track,
-                  handler: handler,
-                  onTap: () => handler.loadQueue(_results, index),
+            child: StreamBuilder<MediaItem?>(
+              stream: handler.mediaItem,
+              builder: (context, mediSnap) {
+                final currentId = mediSnap.data?.id;
+                return ListView.builder(
+                  itemCount: _results.length,
+                  itemBuilder: (context, index) {
+                    final track = _results[index];
+                    final isPlaying = currentId == track.id.toString();
+                    return _SearchTile(
+                      track: track,
+                      isPlaying: isPlaying,
+                      onTap: () => handler.loadQueue(_results, index),
+                    );
+                  },
                 );
               },
             ),
@@ -151,79 +157,72 @@ class _SearchViewState extends ConsumerState<SearchView> {
 
 class _SearchTile extends StatelessWidget {
   final TrackModel track;
-  final TempoAudioHandler handler;
+  final bool isPlaying;
   final VoidCallback onTap;
 
   const _SearchTile({
     required this.track,
-    required this.handler,
+    required this.isPlaying,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<MediaItem?>(
-      stream: handler.mediaItem,
-      builder: (context, snap) {
-        final isPlaying = snap.data?.id == track.id.toString();
-        return InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: CachedNetworkImage(
-                      imageUrl: track.thumbnailUrl,
-                      fit: BoxFit.cover,
-                      memCacheWidth: 192,
-                      memCacheHeight: 192,
-                      errorWidget: (_, _, _) => Container(
-                        color: Colors.white.withValues(alpha: 0.05),
-                        child: const Icon(Icons.music_note,
-                            color: Colors.white24, size: 20),
-                      ),
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: CachedNetworkImage(
+                  imageUrl: track.thumbnailUrl,
+                  fit: BoxFit.cover,
+                  memCacheWidth: 192,
+                  memCacheHeight: 192,
+                  errorWidget: (_, _, _) => Container(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    child: const Icon(Icons.music_note,
+                        color: Colors.white24, size: 20),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    track.title,
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: isPlaying ? Colors.greenAccent : Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        track.title,
-                        maxLines: 1,
-                        style: TextStyle(
-                          color:
-                              isPlaying ? Colors.greenAccent : Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${track.artist} · ${track.album}',
-                        maxLines: 1,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
-                          fontSize: 12,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 2),
+                  Text(
+                    '${track.artist} · ${track.album}',
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.5),
+                      fontSize: 12,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 }
