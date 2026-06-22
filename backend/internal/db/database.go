@@ -72,6 +72,10 @@ func New(path string) (*DB, error) {
 		return nil, err
 	}
 
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_tracks_title ON tracks(title COLLATE NOCASE)")
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist COLLATE NOCASE)")
+	db.Exec("CREATE INDEX IF NOT EXISTS idx_tracks_album ON tracks(album COLLATE NOCASE)")
+
 	return &DB{conn: db}, nil
 }
 
@@ -146,6 +150,7 @@ func (db *DB) GetRandomTracks(limit int) ([]models.Track, error) {
 
 func (db *DB) SearchTracks(query string, limit int) ([]models.Track, error) {
 	q := "%" + query + "%"
+	prefix := query + "%"
 	rows, err := db.conn.Query(`
 		SELECT id, title, artist, album, path, year, duration
 		FROM tracks
@@ -156,7 +161,7 @@ func (db *DB) SearchTracks(query string, limit int) ([]models.Track, error) {
 			     ELSE 2 END,
 			title
 		LIMIT ?
-	`, q, q, q, q, q, limit)
+	`, q, q, q, prefix, prefix, limit)
 	if err != nil {
 		return nil, err
 	}
