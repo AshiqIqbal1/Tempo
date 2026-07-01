@@ -1,6 +1,7 @@
-# --- macOS ---
+# macOS
 .DS_Store
-# --- Go ---
+
+# Go
 *.exe
 *.exe~
 *.dll
@@ -14,15 +15,23 @@ profile.cov
 go.work
 go.work.sum
 .env
+backend/tempo.db
 
-# --- Flutter ---
+# Flutter
 .dart_tool/
 .packages
 .pub-cache/
 .pub/
 build/
 *.lock
+frontend/.metadata
+frontend/.flutter-plugins*
 
-# --- IDE/Editors ---
+# IDE
 .idea/
 .vscode/
+*.iml
+
+# Generated
+*.apk
+*.aab
